@@ -41,10 +41,10 @@ end
 SQLattice_site(lat::Lat, i::Int, j::Int) where Lat <: SQLattice{T} where T =
     SQLattice_site{Lat}(lat,i,j)
 
-function Site(lat::Lat, i::Int=1) where Lat <: SQLattice{T} where T
-    I=CartesianIndices(lat)[i]
-    SQLattice_site(lat,I[1],I[2])
-end
+# function Site(lat::Lat, i::Int=1) where Lat <: SQLattice{T} where T
+#     I=CartesianIndices(lat)[i]
+#     SQLattice_site(lat,I[1],I[2])
+# end
 
 Base.getindex(lat::SQLattice{T},I::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T = getindex(lat.nodes,I.i,I.j)
 
