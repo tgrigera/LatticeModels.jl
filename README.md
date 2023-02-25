@@ -10,9 +10,6 @@ Main authors:
 
  - Tomás S. Grigera --- University of La Plata
 
-# License
-
-BioStatPhys.jl is Copyright (C) 2022 
 
 # License
 

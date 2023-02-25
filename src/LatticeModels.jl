@@ -1,5 +1,5 @@
 module LatticeModels
 
-# Write your package code here.
+include("./graphs/Graphs.jl")
 
 end

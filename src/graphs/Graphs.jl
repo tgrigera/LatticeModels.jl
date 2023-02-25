@@ -1,4 +1,4 @@
-# runtests.jl -- run all tests for LatticeModels.jl
+# Graphs.jl -- Definitions for graphs and lattices underlying models
 #
 # Copyright (C) 2023 Tomas S. Grigera <tgrigera@iflysib.unlp.edu.ar>
 #
@@ -15,11 +15,17 @@
 # For details, see the file LICENSE in the root directory, or
 # check <https://www.gnu.org/licenses/>.
 
-using LatticeModels
-using Test
+#
+# General definitions
+#
 
-include("./graphtests.jl")
+abstract type Site end
 
-@testset "LatticeModels.jl" begin
-    SQLattice_test()
-end
+#
+# Implementations of graphs and lattices
+#
+
+include("./SQLattice.jl")
+# include("./SCLattice.jl")
+
+
