@@ -1,0 +1,13 @@
+name = "LatticeModels"
+uuid = "ba061c01-2eed-4a80-a5f7-9f291138a0fe"
+authors = ["Tomas S. Grigera <tgrigera@iflysib.unlp.edu.ar> and contributors"]
+version = "0.1.0"
+
+[compat]
+julia = "1.8"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
