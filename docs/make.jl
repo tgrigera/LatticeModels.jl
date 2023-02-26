@@ -4,10 +4,10 @@ using Documenter
 DocMeta.setdocmeta!(LatticeModels, :DocTestSetup, :(using LatticeModels); recursive=true)
 
 makedocs(;
-    modules=[LatticeModels],
-    authors="Tomas S. Grigera <tgrigera@iflysib.unlp.edu.ar> and contributors",
-    repo="https://github.com/tgrigera/LatticeModels.jl/blob/{commit}{path}#{line}",
     sitename="LatticeModels.jl",
+    modules=[LatticeModels],
+    authors="Tomás S. Grigera",
+    #repo="https://github.com/tgrigera/LatticeModels.jl/blob/{commit}{path}#{line}",
     format=Documenter.HTML(;
         prettyurls=get(ENV, "CI", "false") == "true",
         canonical="https://tgrigera.github.io/LatticeModels.jl",
@@ -16,10 +16,12 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "Graphs" => "graphs.md",
+        "Models" => "models.md"
     ],
 )
 
-deploydocs(;
-    repo="github.com/tgrigera/LatticeModels.jl",
-    devbranch="main",
-)
+if get(ENV, "CI", nothing) == "true" 
+    deploydocs( repo = "github.com/tgrigera/LatticeModels.jl.git",
+                    devbranch="main")
+end
