@@ -17,6 +17,7 @@
 
 export Site, connectivity, foreach_neighbour, foreach_neighbour!, foreach_bond
 export SQLattice_open, SQLattice_periodic, SQLattice_site, random_site, random_site!
+import Base.similar
 
 #consider: abstract type Graph{T} <: AbstractArray{T} end
 
@@ -64,6 +65,8 @@ function random_site!(rng,site::SQLattice_site{Lat}) where Lat <: SQLattice{T} w
     site.j=rand(rng,1:size(site.nodes,2))
 end
 
+###############################################################################
+#
 # Open boundary conditions
 
 struct SQLattice_open{T} <: SQLattice{T}
@@ -71,6 +74,9 @@ struct SQLattice_open{T} <: SQLattice{T}
 end
 
 SQLattice_open{T}(Lx,Ly) where T = SQLattice_open{T}(Matrix{T}(undef,Lx,Ly))
+
+Base.similar(lat::SQLattice_open{T} where T,type::Type{N} where N) =
+        SQLattice_open{type}(size(lat)...)
 
 function foreach_neighbour(f,site::SQLattice_site{SQLattice_open{T}}) where T
 #    i,j=site.I[1],site.I[2]
@@ -115,7 +121,9 @@ function foreach_bond(f,lat::SQLattice_open{T}) where T
     end
 end
 
+#
 # Periodic boundary conditions
+#
 
 struct SQLattice_periodic{T} <: SQLattice{T}
     nodes::Matrix{T}
@@ -124,8 +132,6 @@ struct SQLattice_periodic{T} <: SQLattice{T}
     E::Vector{Int}
     W::Vector{Int}
 end
-
-#SQLattice_periodic{T}(Lx,Ly) where T = SQLattice_periodic{T}(Matrix{T}(undef,Lx,Ly))
 
 function SQLattice_periodic{T}(Lx,Ly) where T
     lat=SQLattice_periodic{T}(Matrix{T}(undef,Lx,Ly),Vector{Int}(undef,Ly),Vector{Int}(undef,Ly),
@@ -149,7 +155,8 @@ function SQLattice_periodic{T}(Lx,Ly) where T
     return lat
 end
 
-# perindex(i,N) = 1 + mod(i-1,N)
+Base.similar(lat::SQLattice_periodic{T} where T,type::Type{N} where N) =
+        SQLattice_periodic{type}(size(lat)...)
 
 # function foreach_neighbour(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
 #     #L,M=size(site.nodes)
@@ -167,6 +174,18 @@ function foreach_neighbour(f,site::SQLattice_site{SQLattice_periodic{T}}) where 
     f(site.nodes[site.i,site.nodes.N[site.j]])
     f(site.nodes[site.i,site.nodes.S[site.j]])
 end
+
+neighbours(site::SQLattice_site{SQLattice_periodic{T}}) where T =
+    [ site.nodes[site.nodes.E[site.i],site.j], 
+      site.nodes[site.nodes.W[site.i],site.j], 
+      site.nodes[site.i,site.nodes.N[site.j]],
+      site.nodes[site.i,site.nodes.S[site.j]] ]
+
+neighbour_indices(site::SQLattice_site{SQLattice_periodic{T}}) where T =
+    CartesianIndex.([ (site.nodes.E[site.i],site.j), 
+      (site.nodes.W[site.i],site.j), 
+      (site.i,site.nodes.N[site.j]),
+      (site.i,site.nodes.S[site.j]) ])
 
 # function foreach_neighbour!(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
 #     L,M=size(site.nodes)
