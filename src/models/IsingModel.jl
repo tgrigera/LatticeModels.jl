@@ -194,9 +194,43 @@ function Metropolis!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_int
     return save_interval>0 ? (E, M) : nothing
 end
 
+###############################################################################
 #
 # Wolff algorithm
-#
+
+function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+    @assert steps ≥ 0
+    @assert save_interval ≥ 0
+
+    ostart = IS.steps == 0 ? 0 : IS.steps+1
+    nspins=length(IS.σ)
+    saveidx::Int=1
+    if save_interval >0
+        nsave = length(ostart:save_interval:IS.steps+steps)
+        M = zeros(Float64, nsave)
+        E = zeros(Float64, nsave)
+        if ostart==IS.steps
+            M[1]=IS.M/nspins
+            E[1]=IS.E/nspins
+            saveidx=2
+        end
+    end
+
+    for _ in 1:steps
+        Wolff_step!(IS)
+        IS.steps += 1
+        if save_interval>0 && IS.steps % save_interval == 0
+            M[saveidx]=IS.M/nspins
+            E[saveidx]=IS.E/nspins
+            saveidx += 1
+        end
+        # if t ∈ 1:save_interval:steps
+        #     selectdim(σ_t, ndims(σ) + 1, cld(t, save_interval)) .= σ
+        # end
+    end
+
+    return save_interval>0 ? (E, M) : nothing
+end
 
 Wolff_padd(β::Real) = -expm1(-2β)
 
