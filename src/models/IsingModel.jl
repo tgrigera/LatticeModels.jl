@@ -16,9 +16,8 @@
 # check <https://www.gnu.org/licenses/>.
 
 using Random
-import SpecialFunctions
 
-export Ising
+export Ising, set_temperature!, magnetization, set_energy_mag!
 
 """
     Ising
@@ -43,25 +42,30 @@ mutable struct Ising{Graph,RNG_T<:AbstractRNG}
     RNG::RNG_T
 end
 
-function Ising(graph;seed=33,T=1.,h=0.)
-    RNG=Random.Xoshiro(seed)
-    z=connectivity(graph)
-    probt=zeros(Float64,z+1,2)
-    I=Ising(h,0.,0,0.,0.,0,0,0.,graph,probt,RNG)
+function Ising(graph_type,L...;seed=33,T=1.,h=0.,ordered=false)
+    RNG = Random.Xoshiro(seed)
+    graph = graph_type{Int8}(L...)
+    z = connectivity(graph)
+    probt = zeros(Float64,z+1,2)
+    I = Ising(h,0.,0,0.,0.,0,0,0.,graph,probt,RNG)
     set_temperature!(I,T)
-    rand!(I.σ.nodes,[-1,1])
+    if ordered
+        I.σ .= 1
+    else
+        rand!(I.σ.nodes,[-1,1])
+    end
     set_energy_mag!(I)
     return I
 end
 
 function set_temperature!(IS::Ising,T)
-    IS.T=T
-    IS.β=1. /T
-    IS.βh=IS.β*IS.h
-    z=connectivity(IS.σ)
-    for S=0:1
-      for H=0:z
-	DE=( 2*(-z+2*H) + 2*IS.h ) * (2*S-1);
+    IS.T = T
+    IS.β = 1. /T
+    IS.βh = IS.β*IS.h
+    z = connectivity(IS.σ)
+    for S ∈ 0:1
+      for H ∈ 0:z
+	DE = ( 2*(-z+2*H) + 2*IS.h ) * (2*S-1);
 	IS.probt[H+1,S+1] = DE<0  ?  2 : exp(-IS.β*DE)
       end
     end
@@ -78,25 +82,26 @@ function energy_h0(IS::Ising{T}) where T
 end
 
 function set_energy_mag!(IS::Ising{T}) where T
-    IS.E0=energy_h0(IS)
-    IS.M=magnetization(IS)
-    IS.E= IS.E0 - IS.h*IS.M
+    IS.E0 = energy_h0(IS)
+    IS.M = magnetization(IS)
+    IS.E = IS.E0 - IS.h*IS.M
 end
 
 #
 # Some exact values (from Onsager's analytical results)
 #
 
-export Ising_critical_temperature, Onsager_magnetization, Onsager_internal_energy,
+import SpecialFunctions
+export Ising_SQ_critical_temperature, Onsager_magnetization, Onsager_internal_energy,
        Onsager_heat_capacity
 
 """
-    Ising_critical_temperature
+    Ising_SQ_critical_temperature
 
 Critical temperature of the Ising model on the (infinite) square lattice, obtained
 by Onsager.
 """
-const Ising_critical_temperature = 2 / log1p(√2)
+const Ising_SQ_critical_temperature = 2 / log1p(√2)
 
 """
     Onsager_magnetization(β)
@@ -136,9 +141,11 @@ function Onsager_heat_capacity(β::Real)
     return β^2 * coth(2β)^2 * (2/π) * (((j - 1//2)^2 + 7//4) * K - 2E - (1 - j) * π / 2)
 end
 
+###############################################################################
 #
 # Single spin-flip Metropolis
-#
+
+export Metropolis!
 
 function Metropolis_sweep!(IS::Ising)
     I = random_site(IS.σ)
@@ -197,6 +204,8 @@ end
 ###############################################################################
 #
 # Wolff algorithm
+
+export Wolff!
 
 function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
     @assert steps ≥ 0
