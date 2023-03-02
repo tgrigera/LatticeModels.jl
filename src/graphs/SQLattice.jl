@@ -173,20 +173,9 @@ neighbour_indices(site::SQLattice_site{SQLattice_periodic{T}}) where T =
       (site.I[1],site.nodes.N[site.I[2]]),
       (site.I[1],site.nodes.S[site.I[2]]) ])
 
-# function foreach_neighbour!(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
-#     L,M=size(site.nodes)
-#     i,j=site.I[1],site.I[2]
-#     li=LinearIndices(site.nodes)
-#     f(Ref(site.nodes,li[perindex(i-1,L),j]))
-#     f(Ref(site.nodes,li[perindex(i+1,L),j]))
-#     f(Ref(site.nodes,li[i,perindex(j-1,M)]))
-#     f(Ref(site.nodes,li[i,perindex(j+1,M)]))
-# end
-
 function foreach_neighbour!(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
     li=LinearIndices(site.nodes)
-#    i,j=site.I[1],site.I[2]
-    i,j=site.i,site.j
+    i,j=site.I[1],site.I[2]
     f(Ref(site.nodes,li[site.nodes.E[i],j]))
     f(Ref(site.nodes,li[site.nodes.W[i],j]))
     f(Ref(site.nodes,li[i,site.nodes.N[j]]))

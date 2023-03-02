@@ -33,8 +33,7 @@ function SQLattice_test()
         foreach_neighbour!(rs) do s
             s[]=(0,0)
         end
-        #i,j=rs.I[1],rs.I[2]
-        i,j=rs.i,rs.j
+        i,j=rs.I[1],rs.I[2]
         @test (i>=L || lat[i+1,j]==(0,0)) &&
             (i<=1 || lat[i-1,j]==(0,0)) &&
             (j>=M || lat[i,j+1]==(0,0)) &&
@@ -53,8 +52,7 @@ function SQLattice_test()
         foreach_neighbour!(rs) do s
             s[]=(0,0)
         end
-        #i,j=rs.I[1],rs.I[2]
-        i,j=rs.i,rs.j
+        i,j=rs.I[1],rs.I[2]
         @test (i>=L || lat[i+1,j]==(0,0)) &&
             (i<L || lat[1,j]==(0,0)) &&
             (i<=1 || lat[i-1,j]==(0,0)) &&
