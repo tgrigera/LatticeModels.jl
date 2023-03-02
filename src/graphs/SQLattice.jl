@@ -29,40 +29,38 @@ Base.size(lat::SQLattice{T}) where T = size(lat.nodes)
 
 Base.getindex(lat::SQLattice{T},i::Int) where T = getindex(lat.nodes,i)
 
+Base.getindex(lat::SQLattice{T},I::CartesianIndex{2}) where T = getindex(lat.nodes,I)
+
 Base.setindex!(lat::SQLattice{T},v,i::Int) where T = setindex!(lat.nodes,v,i)
+
+Base.setindex!(lat::SQLattice{T},v,I::CartesianIndex{2}) where T = setindex!(lat.nodes,v,I)
 
 Base.IndexStyle(::Type{<:SQLattice}) = IndexLinear()
 
 mutable struct SQLattice_site{Lat} <: Site where Lat <: SQLattice{T} where T
     nodes::Lat
-    i::Int
-    j::Int
+    I::CartesianIndex{2}
 end
 
 SQLattice_site(lat::Lat, i::Int, j::Int) where Lat <: SQLattice{T} where T =
-    SQLattice_site{Lat}(lat,i,j)
+    SQLattice_site{Lat}(lat,CartesianIndex(i,j))
 
-# function Site(lat::Lat, i::Int=1) where Lat <: SQLattice{T} where T
-#     I=CartesianIndices(lat)[i]
-#     SQLattice_site(lat,I[1],I[2])
-# end
 
-Base.getindex(lat::SQLattice{T},I::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T = getindex(lat.nodes,I.i,I.j)
+Base.getindex(lat::SQLattice{T},I::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T = getindex(lat.nodes,I.I)
 
-Base.setindex!(lat::SQLattice{T},v,I::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T = setindex!(lat.nodes,v,I.i,I.j)
+Base.setindex!(lat::SQLattice{T},v,I::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T = setindex!(lat.nodes,v,I.I)
 
 random_site(lat::Lat) where Lat <: SQLattice{T} where T = SQLattice_site(lat,rand(1:size(lat,1)),rand(1:size(lat,2)))
 
 random_site(rng,lat::Lat) where Lat <: SQLattice{T} where T = SQLattice_site(lat,rand(rng,1:size(lat,1)),rand(rng,1:size(lat,2)))
 
 function random_site!(site::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T
-    site.i=rand(1:size(site.nodes,1))
-    site.j=rand(1:size(site.nodes,2))
+    site.I=CartesianIndex(rand(1:size(site.nodes,1)),rand(1:size(site.nodes,1)))
 end
 
 function random_site!(rng,site::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T
-    site.i=rand(rng,1:size(site.nodes,1))
-    site.j=rand(rng,1:size(site.nodes,2))
+#    site.I=rand(rng,CartesianIndices(site.nodes))  # slower?
+    site.I=CartesianIndex(rand(rng,1:size(site.nodes,1)),rand(rng,1:size(site.nodes,1)))
 end
 
 ###############################################################################
@@ -79,8 +77,7 @@ Base.similar(lat::SQLattice_open{T} where T,type::Type{N} where N) =
         SQLattice_open{type}(size(lat)...)
 
 function foreach_neighbour(f,site::SQLattice_site{SQLattice_open{T}}) where T
-#    i,j=site.I[1],site.I[2]
-    i,j=site.i,site.j
+    i,j=site.I[1],site.I[2]
     if i>1 f(site.nodes[i-1,j]) end
     if i<size(site.nodes,1) f(site.nodes[i+1,j]) end
     if j>1 f(site.nodes[i,j-1]) end
@@ -88,8 +85,7 @@ function foreach_neighbour(f,site::SQLattice_site{SQLattice_open{T}}) where T
 end
 
 function foreach_neighbour!(f,site::SQLattice_site{SQLattice_open{T}}) where T
-    #i,j=site.I[1],site.I[2]
-    i,j=site.i,site.j
+    i,j=site.I[1],site.I[2]
     li=LinearIndices(site.nodes)
     if i>1 f(Ref(site.nodes,li[i-1,j])) end
     if i<size(site.nodes,1) f(Ref(site.nodes,li[i+1,j])) end
@@ -121,9 +117,9 @@ function foreach_bond(f,lat::SQLattice_open{T}) where T
     end
 end
 
+###############################################################################
 #
 # Periodic boundary conditions
-#
 
 struct SQLattice_periodic{T} <: SQLattice{T}
     nodes::Matrix{T}
@@ -158,34 +154,24 @@ end
 Base.similar(lat::SQLattice_periodic{T} where T,type::Type{N} where N) =
         SQLattice_periodic{type}(size(lat)...)
 
-# function foreach_neighbour(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
-#     #L,M=size(site.nodes)
-#     #i,j=site.I[1],site.I[2]
-#     f(site.nodes[perindex(site.I[1]-1,size(site.nodes,1)),site.I[2]])
-#     f(site.nodes[perindex(site.I[2]+1,size(site.nodes,1)),site.I[2]])
-#     f(site.nodes[site.I[1],perindex(site.I[2]-1,size(site.nodes,2))])
-#     f(site.nodes[site.I[1],perindex(site.I[2]+1,size(site.nodes,2))])
-# end
-# perindex(i,N) = 1 + mod(i-1,N)
-
 function foreach_neighbour(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
-    f(site.nodes[site.nodes.E[site.i],site.j])
-    f(site.nodes[site.nodes.W[site.i],site.j])
-    f(site.nodes[site.i,site.nodes.N[site.j]])
-    f(site.nodes[site.i,site.nodes.S[site.j]])
+    f(site.nodes[site.nodes.E[site.I[1]],site.I[2]])
+    f(site.nodes[site.nodes.W[site.I[1]],site.I[2]])
+    f(site.nodes[site.I[1],site.nodes.N[site.I[2]]])
+    f(site.nodes[site.I[1],site.nodes.S[site.I[2]]])
 end
 
 neighbours(site::SQLattice_site{SQLattice_periodic{T}}) where T =
-    [ site.nodes[site.nodes.E[site.i],site.j], 
-      site.nodes[site.nodes.W[site.i],site.j], 
-      site.nodes[site.i,site.nodes.N[site.j]],
-      site.nodes[site.i,site.nodes.S[site.j]] ]
+    [ site.nodes[site.nodes.E[site.I[1]],site.I[2]], 
+      site.nodes[site.nodes.W[site.I[1]],site.I[2]], 
+      site.nodes[site.I[1],site.nodes.N[site.I[2]]],
+      site.nodes[site.I[1],site.nodes.S[site.I[2]]] ]
 
 neighbour_indices(site::SQLattice_site{SQLattice_periodic{T}}) where T =
-    CartesianIndex.([ (site.nodes.E[site.i],site.j), 
-      (site.nodes.W[site.i],site.j), 
-      (site.i,site.nodes.N[site.j]),
-      (site.i,site.nodes.S[site.j]) ])
+    CartesianIndex.([ (site.nodes.E[site.I[1]],site.I[2]), 
+      (site.nodes.W[site.I[1]],site.I[2]), 
+      (site.I[1],site.nodes.N[site.I[2]]),
+      (site.I[1],site.nodes.S[site.I[2]]) ])
 
 # function foreach_neighbour!(f,site::SQLattice_site{SQLattice_periodic{T}}) where T
 #     L,M=size(site.nodes)

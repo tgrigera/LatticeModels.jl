@@ -245,10 +245,10 @@ Wolff_padd(β::Real) = -expm1(-2β)
 
 function Wolff_step!(IS::Ising)
     I = random_site(IS.σ)
-    cluster = Wolff_cluster(IS, I, Wolff_padd(IS.β) )
+    cluster = similar(IS.σ,Bool)
+    Wolff_cluster!(IS, I, cluster, Wolff_padd(IS.β) )
     cluster_size = sum(cluster.nodes)
     ΔM = -2IS.σ[I] * cluster_size
-    #flip_cluster!(σ, cluster)
     IS.σ[cluster.nodes] *= -1
     IS.M += ΔM
     IS.E0=energy_h0(IS)
@@ -256,10 +256,9 @@ function Wolff_step!(IS::Ising)
     return cluster_size
 end
     
-function Wolff_cluster(IS::Ising,I::Site, Padd::Real = 1)
-    cluster = similar(IS.σ,Bool)
+function Wolff_cluster!(IS::Ising, I::Site, cluster, Padd::Real = 1)
     cluster.nodes .= false
-    cluster[I.i,I.j] = true
+    cluster[I.I] = true
     queue = [I]
     while !isempty(queue)
         J = pop!(queue)
@@ -270,5 +269,4 @@ function Wolff_cluster(IS::Ising,I::Site, Padd::Real = 1)
             end
         end
     end
-    return cluster
 end
