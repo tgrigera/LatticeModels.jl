@@ -42,6 +42,14 @@ mutable struct Ising{Graph,RNG_T<:AbstractRNG}
     RNG::RNG_T
 end
 
+"""
+    Ising(graph_type,L...;seed=33,T=1.,h=0.,ordered=false)
+
+Return an `Ising` object with underlying graph `graph_type`,
+temperature `T` and field `h`.  A local random number generator with
+seed `seed` will be created.  Spins will be will be set to a random
+valuse or, if `ordered==true`, to 1.
+"""
 function Ising(graph_type,L...;seed=33,T=1.,h=0.,ordered=false)
     RNG = Random.Xoshiro(seed)
     graph = graph_type{Int8}(L...)
@@ -167,6 +175,14 @@ function Metropolis_sweep!(IS::Ising)
     end
 end
 
+"""
+    Metropolis!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+
+Do `steps` steps per spin of single-spin-flip Metropolis Monte Carlo
+for the Ising model `IS`.  `conf_save_interval` is not implemented.
+If `save_interval>0` return a tuple (E, M) with energy and
+magnetization per spin, saved every `save_interval` steps.
+"""
 function Metropolis!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
     @assert steps ≥ 0
     @assert save_interval ≥ 0
@@ -207,7 +223,17 @@ end
 
 export Wolff!
 
+"""
+    Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+
+Do `steps` Monte Carlo steps for the Ising model `IS` using the Wolff
+cluster algorithm.  `conf_save_interval` is not implemented.  If
+`save_interval>0` return a tuple (E, M) with energy and magnetization
+per spin, saved every `save_interval` steps.
+
+"""
 function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+
     @assert steps ≥ 0
     @assert save_interval ≥ 0
 
