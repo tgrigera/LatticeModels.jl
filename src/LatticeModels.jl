@@ -21,4 +21,6 @@ include("./graphs/Graphs.jl")
 
 include("./models/IsingModel.jl")
 
+include("./models/Sandpiles.jl")
+
 end
