@@ -65,3 +65,47 @@ function SQLattice_test()
     end
 
 end
+
+function SQLattice_test_binning()
+    @testset "Testing binnings" begin
+        lat=SQLattice_open{Int}(30,33)
+        bn=distance_binning(lat)
+        IS=CartesianIndices(lat)
+        ok=true
+        for i ∈ eachindex(bn)
+            dc = binc(bn,i)
+            for pp in bn[i]
+                i,j=pp
+                I,J=IS[i],IS[j]
+                D = I-J
+                d = sqrt( D[1]^2 + D[2]^2 )
+                if abs(d-dc)>0.5 ok=false
+                    println("Failing ",I,' ',J,' ',D," for binc= ",dc)
+                    break
+                end
+            end
+        end
+        @test ok
+
+        lat = SQLattice_periodic{Int}(30,33)
+        bn = distance_binning(lat)
+        IS = CartesianIndices(lat)
+        ok = true
+        for i ∈ eachindex(bn)
+            dc = binc(bn,i)
+            for pp in bn[i]
+                i,j=pp
+                I,J = IS[i],IS[j]
+                D = I-J; 
+                dx = LatticeModels.ddiff(D[1],0,size(lat,1))
+                dy = LatticeModels.ddiff(D[2],0,size(lat,2))
+                d = sqrt( dx^2 + dy^2 )
+                if abs(d-dc)>0.5 ok=false
+                    println("Failing ",I,' ',J,' ',D," for binc= ",dc)
+                    break
+                end
+            end
+        end
+
+    end
+end

@@ -16,10 +16,12 @@
 # check <https://www.gnu.org/licenses/>.
 
 using LatticeModels
+using BioStatPhys
 using Test
 
 include("./graphtests.jl")
 
 @testset "LatticeModels.jl" begin
     SQLattice_test()
+    SQLattice_test_binning()
 end

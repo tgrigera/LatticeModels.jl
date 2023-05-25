@@ -117,6 +117,31 @@ function foreach_bond(f,lat::SQLattice_open{T}) where T
     end
 end
 
+#
+# Distance binning
+#
+
+import BioStatPhys
+import LinearAlgebra
+
+function BioStatPhys.distance_binning(lat::SQLattice_open{T},Δr=1.) where T
+    TII = Tuple{Int,Int}
+    rmax = sqrt( (size(lat,1)-1)^2 + (size(lat,2)-1)^2 )
+    binning = BioStatPhys.DistanceBinning(Δ=Δr,min=0.,max=rmax,round_max=RoundUp,
+                                          init=(x,n)->[TII[] for _=1:n])
+    Indices=CartesianIndices(lat)
+    LIndices=LinearIndices(Indices)
+    for I ∈ Indices
+        i = LIndices[I]
+        for J ∈ Indices
+            j = LIndices[J]
+            push!(binning[LinearAlgebra.norm( Tuple(I-J) )],(i,j))
+        end
+    end
+    return binning
+end
+
+
 ###############################################################################
 #
 # Periodic boundary conditions
@@ -196,4 +221,33 @@ function foreach_bond(f,lat::SQLattice_periodic{T}) where T
     @inbounds for i=1:L
         f(lat.nodes[i,M],lat.nodes[i,1])
     end
+end
+
+@inline function ddiff(a::Int,b::Int,box_length::Int)
+  temp=a-b
+  return temp-box_length*round(Int,temp/box_length);
+end
+
+@inline function distancesq(lat::SQLattice_periodic{T},I,J) where T
+    dx = ddiff(I[1],J[1],size(lat,1))
+    dy = ddiff(I[2],J[2],size(lat,2))
+   return dx*dx + dy*dy
+end
+
+
+function BioStatPhys.distance_binning(lat::SQLattice_periodic{T},Δr=1.) where T
+    TII = Tuple{Int,Int}
+    rmax = sqrt( (size(lat,1)-1)^2 + (size(lat,2)-1)^2 ) / 2
+    binning=BioStatPhys.DistanceBinning(Δ=Δr,min=0.,max=rmax,round_max=RoundUp,
+                                       init=(x,n)->[TII[] for _=1:n])
+    Indices=CartesianIndices(lat)
+    LIndices=LinearIndices(Indices)
+    for I ∈ Indices
+        i=LIndices[I]
+        for J ∈ Indices
+            j=LIndices[J]
+            push!(binning[ sqrt(distancesq(lat,I,J)) ],(i,j))
+        end
+    end
+    return binning
 end
