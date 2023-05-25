@@ -19,6 +19,8 @@ module LatticeModels
 
 include("./graphs/Graphs.jl")
 
+include("./aux/LatticeTrajectory.jl")
+
 include("./models/IsingModel.jl")
 
 include("./models/Sandpiles.jl")

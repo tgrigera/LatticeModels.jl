@@ -232,10 +232,12 @@ cluster algorithm.  `conf_save_interval` is not implemented.  If
 per spin, saved every `save_interval` steps.
 
 """
-function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,
+               conf_save_interval::Int=0,conf_save_function=nothing)
 
     @assert steps ≥ 0
     @assert save_interval ≥ 0
+    if conf_save_interval>0 @assert !isnothing(conf_save_function) end
 
     ostart = IS.steps == 0 ? 0 : IS.steps+1
     nspins=length(IS.σ)
@@ -259,9 +261,9 @@ function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval
             E[saveidx]=IS.E/nspins
             saveidx += 1
         end
-        # if t ∈ 1:save_interval:steps
-        #     selectdim(σ_t, ndims(σ) + 1, cld(t, save_interval)) .= σ
-        # end
+        if conf_save_interval>0 && IS.steps % conf_save_interval == 0
+            conf_save_function(IS.σ)
+        end
     end
 
     return save_interval>0 ? (E, M) : nothing
