@@ -78,6 +78,6 @@ function mmap(name::String,t::T) where T<:Type
         d[i]=read(f,Int)
     end
     d[ndims+1]=nrec
-    A=Mmap.mmap(f,Array{t,ndims+1},Tuple(d))
+    A=Mmap.mmap(f,Array{eltype(t),ndims+1},Tuple(d))
     return A,f
 end

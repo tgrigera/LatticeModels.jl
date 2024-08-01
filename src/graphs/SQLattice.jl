@@ -235,7 +235,7 @@ end
 end
 
 
-function BioStatPhys.distance_binning(lat::SQLattice_periodic{T},Δr=1.) where T
+function BioStatPhys.distance_binning(lat::SQLattice_periodic{T},Δr=1.;include_self=false) where T
     TII = Tuple{Int,Int}
     rmax = sqrt( (size(lat,1)-1)^2 + (size(lat,2)-1)^2 ) / 2
     binning=BioStatPhys.DistanceBinning(Δ=Δr,min=0.,max=rmax,round_max=RoundUp,
@@ -246,6 +246,7 @@ function BioStatPhys.distance_binning(lat::SQLattice_periodic{T},Δr=1.) where T
         i=LIndices[I]
         for J ∈ Indices
             j=LIndices[J]
+            if !include_self && i==j continue end
             push!(binning[ sqrt(distancesq(lat,I,J)) ],(i,j))
         end
     end

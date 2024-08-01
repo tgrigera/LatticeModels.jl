@@ -112,8 +112,9 @@ sites are subcritical.
 """
 function run!(pile::BTW_sandpile;
               steps::Int=1,history::Union{Sandpile_history,Nothing}=nothing,
-              reference_conf=nothing)
+              conf_save_interval::Int=0,conf_save_function=nothing)   
 
+    if conf_save_interval @assert !isnothing(conf_save_function) end
     step0=pile.time
     while pile.time<step0+steps
         ir=rand(pile.RNG,CartesianIndices(pile.z_in))
@@ -125,9 +126,9 @@ function run!(pile::BTW_sandpile;
             if !isnothing(history)
                 push!(history.time,pile.time)
                 push!(history.zav,pile.ztot/pile.L^2)
-                if !isnothing(reference_conf)
-                    compute_overlap(pile,reference_conf,history)
-                end
+                # if !isnothing(reference_conf)
+                #     compute_overlap(pile,reference_conf,history)
+                # end
             end
         end
     end
