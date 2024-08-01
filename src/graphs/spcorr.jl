@@ -1,0 +1,214 @@
+# spcorr.jl -- Space correlations for lattices
+#
+# Copyright (C) 2023 Tomas S. Grigera <tgrigera@iflysib.unlp.edu.ar>
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# For details, see the file LICENSE in the root directory, or
+# check <https://www.gnu.org/licenses/>.
+
+
+using AbstractFFTs
+import Statistics
+
+function space_correlation_Cr_Ck_iso(latset::AbstractVector)
+
+    (rx, ry, Crxy), (kx, ky, Ck) = space_correlation_Cr_Ck(latset)
+    r,Cr = to_iso_2d(rx,ry,Crxy)
+    k,Ck = to_iso_2d(kx,ky,Ck)
+
+    return r,Cr,k,Ck
+    
+end
+
+function space_correlation_Cr_Ck_iso(lat::Matrix{T}) where T<:Number
+
+    (rx, ry, Crxy) , (kx, ky, Ck) = space_correlation_Cr_Ck(lat)
+    r,Cr = to_iso_2d(rx,ry,Crxy)
+    k,Ck = to_iso_2d(kx,ky,Ck)
+
+    return r,Cr,k,Ck
+    
+end
+
+function space_correlation_Cr_Ck(latset::AbstractVector)
+
+    CC = space_correlation_Cr_Ck(latset[1],dry_run=true)
+    Cr = last(first(CC))
+    rr = CC[1][1:length(CC[1])-1]
+    Ck = last(last(CC))
+    rk = CC[2][1:length(CC[1])-1]
+
+    for lat in latset
+        CC1 = space_correlation_Cr_Ck(lat)
+        Cr .+= last(first(CC1))
+        Ck .+= last(last(CC1))
+    end
+    return (rr...,Cr/size(latset,1)),(rk...,Ck/size(latset,1))
+
+end
+
+function space_correlation_Cr_Ck(lat::AbstractMatrix{T};dry_run=false) where T<:Number
+    kx,ky,Ck = space_correlation_Ck_fft(lat,dry_run)
+    Crxy = dry_run ? zeros(Float64,size(lat)) : real.(ifft(Ck))
+    rx = size(lat,1) * fftfreq(size(lat,1))
+    ry = size(lat,2) * fftfreq(size(lat,2))
+    return (rx, ry, Crxy) , (kx, ky, Ck)
+end
+
+function to_iso_2d(rx,ry,C)
+    rmax = max(maximum(rx),maximum(ry))
+    Δ = min(rx[2],ry[2])
+    Np = BioStatPhys.BinnedVector{Int}(Δ=Δ, min=Δ,max=rmax,round_max=RoundUp,
+                                       init=zeros)
+    Ciso = BioStatPhys.BinnedVector{Float64}(Δ=Δ, min=Δ,max=rmax,round_max=RoundUp,
+                                              init=zeros)
+    for (ik,kx) ∈ enumerate(rx), (jk,ky) ∈ enumerate(ry)
+        k = sqrt(kx^2 + ky^2)
+        Np[k] +=1
+        Ciso[k] += C[ik,jk]
+    end
+
+    C0 = C[1,1]
+    Ciso[0] -= C0
+    Np[0] -= 1
+
+    return vcat(0,collect(range(Ciso))),vcat(C0,Ciso./Np)
+end
+
+function space_correlation_Ck_fft(lat::AbstractMatrix{T},dry_run=false) where T<:Number
+    Lx = size(lat,1)
+    Ly = size(lat,2)
+    N = Lx*Ly
+    kxr = 2π * fftfreq(Lx)
+    kyr = 2π * fftfreq(Ly)
+    if dry_run return kxr,kyr,zeros(Float64,size(lat)) end
+
+    Ck = abs2.(fft(lat)) ./ N
+    return kxr,kyr,Ck
+end
+
+###############################################################################
+#
+# FFT routines for non-peridic lattices (2D)
+#
+
+function space_correlation_Cr_nonperiodic_iso(latset::AbstractVector;connected=false,Δ=nothing)
+    rx,ry,Cr = space_correlation_Cr_nonperiodic(latset,connected=connected,Δ=Δ)
+    r,C = LatticeModels.to_iso_2d(rx,ry,Cr)
+    return r,C
+end
+
+function space_correlation_Cr_nonperiodic(latset::AbstractVector;connected=false,Δ=nothing)
+    Cr = zero(latset[1])
+    rr = zero(Cr)
+
+    for lat in latset
+        rr,CC = space_correlation_Cr_nonperiodic(lat,connected=connected)
+        Cr .+= CC
+    end
+    if !isnothing(Δ)
+        rr[1] .*= Δ[1]
+        rr[2] .*= Δ[2]
+    end
+    return rr...,Cr/size(latset,1)
+end
+
+function space_correlation_Cr_nonperiodic(lat::AbstractMatrix{T};
+                                             connected=false) where T<:Number
+    Lx = size(lat,1)
+    Ly = size(lat,2)
+    lat2 = zeros(T,2Lx,2Ly)
+    if connected
+        mean = Statistics.mean(lat)
+        lat2[1:Lx,1:Ly] .= lat .- mean
+    else
+        lat2[1:Lx,1:Ly] .= lat
+    end
+    (rx,ry,Cr),_ = space_correlation_Cr_Ck(lat2)
+    Cr = 4*Lx*Ly*Cr[1:Lx,1:Ly]
+    for i=1:Lx Cr[i,:] ./= (Lx-i+1) end
+    for j=1:Ly Cr[:,j] ./= (Ly-j+1) end
+    return (rx[1:Lx],ry[1:Ly]),Cr
+end
+
+###############################################################################
+#
+# Non-FFT routines, provided as debugging checks for the fft ones.  Not exported
+#
+
+function space_correlation_Ck_iso_direct(latset::AbstractVector)
+
+    kxr,kyr,Ck = space_correlation_Ck_direct(latset)
+    return to_iso_2d(kxr,kyr,Ck)
+
+end
+
+function space_correlation_Ck_direct(latset::AbstractVector)
+
+    randC = space_correlation_Ck_direct(latset[1],dry_run=true)
+    Ck = last(randC)
+    rk = randC[1:length(randC)-1]
+
+    for lat in latset
+        rC1 = space_correlation_Ck_direct(lat)
+        Ck .+= last(rC1)
+    end
+    return rk...,Ck/size(latset,1)
+
+end
+
+function space_correlation_Ck_direct(lat::AbstractMatrix{T};dry_run=false) where T<:Number
+
+    Ck = zeros(Float64,size(lat))
+    Lx = size(lat,1)
+    Ly = size(lat,2)
+    N = Lx*Ly
+    kxr = 2π * fftfreq(Lx)
+    kyr = 2π * fftfreq(Ly)
+    if dry_run return kxr,kyr,Ck end
+
+    for (ik,kx) ∈ enumerate(kxr), (jk,ky) ∈ enumerate(kyr)
+        lk = Complex(0)
+        for I ∈ CartesianIndices(lat)
+            lk += exp( -im*(kx*(I[1]-1) + ky*(I[2]-1)) ) * lat[I]
+        end
+        Ck[ik,jk] = abs2(lk)/N
+    end
+
+    return kxr,kyr,Ck
+
+end
+
+"""
+    DFT(v::Vector{T}) where T<:Number
+
+Compute the 1-d discrete Fourier transform of vector `v`, which must
+be indexed starting from 1.  The discrete Fourier transform is defined
+as
+
+`` F_{k+1} = \\sum_{j=0}^{N-1} \\exp(-2\\pi i j k) v_{j+1} ``
+
+This is intended mainly for debugging purposes, since it should give
+the same result as an FFT routine.
+"""
+function DFT(v::Vector{T}) where T<:Number
+    N = size(v,1)
+    Δ = 2π/N
+
+    F = zeros(ComplexF64,N)
+    for i ∈ 0:N-1
+        for k ∈ 0:N-1
+            F[i+1] += exp( -im*Δ*i*k ) * v[k+1]
+        end
+    end
+    return F
+end

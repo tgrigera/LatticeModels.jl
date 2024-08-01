@@ -27,4 +27,5 @@ abstract type Site end
 
 include("./SQLattice.jl")
 # include("./SCLattice.jl")
+include("./spcorr.jl")
 

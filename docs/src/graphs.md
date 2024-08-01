@@ -25,3 +25,7 @@ Index with integers, `CartesianIndex` or with a `Site` object.  The latter knows
 	foreach_neighbour(J) do s println(s) end
 ```
  
+
+## Space correlations on lattices
+
+File `spcorr.jl` implements several algorithms to compute space correlations in real and Fourier space.  The implementations using FFT can be particularly useful, they have been tested for square lattices.  The main functions are `space_correlation_Cr_Ck_iso` and `space_correlation_Cr_nonperiodic_iso`.  Both compute space correlations averaging over directions (`iso` stands for isotropic), the first assumes periodic boundary conditions, the second open boundaries.  They expect a vector of matrices as argument.
