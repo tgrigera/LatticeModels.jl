@@ -71,6 +71,7 @@ function to_iso_2d(rx,ry,C)
                                        init=zeros)
     Ciso = BioStatPhys.BinnedVector{Float64}(Δ=Δ, min=Δ,max=rmax,round_max=RoundUp,
                                               init=zeros)
+
     for (ik,kx) ∈ enumerate(rx), (jk,ky) ∈ enumerate(ry)
         k = sqrt(kx^2 + ky^2)
         Np[k] +=1
@@ -101,28 +102,35 @@ end
 # FFT routines for non-peridic lattices (2D)
 #
 
-function space_correlation_Cr_nonperiodic_iso(latset::AbstractVector;connected=false,Δ=nothing)
-    rx,ry,Cr = space_correlation_Cr_nonperiodic(latset,connected=connected,Δ=Δ)
-    r,C = LatticeModels.to_iso_2d(rx,ry,Cr)
-    return r,C
+function space_correlation_Cr_Ck_nonperiodic_iso(latset::AbstractVector;connected=false,Δ=nothing)
+    (rx,ry,Cr),(kx,ky,Ck) = space_correlation_Cr_Ck_nonperiodic(latset,connected=connected,Δ=Δ)
+    r,Cr = LatticeModels.to_iso_2d(rx,ry,Cr)
+    k,Ck = LatticeModels.to_iso_2d(kx,ky,Ck)
+    return r,Cr,k,Ck
 end
 
-function space_correlation_Cr_nonperiodic(latset::AbstractVector;connected=false,Δ=nothing)
+function space_correlation_Cr_Ck_nonperiodic(latset::AbstractVector;connected=false,Δ=nothing)
     Cr = zero(latset[1])
-    rr = zero(Cr)
+    rx,ry = zeros(size(Cr,1)),zeros(size(Cr,2))
+    Lkx,Lky = size(Cr).÷2 .+1
+    Ck = zeros(Lkx,Lky)
+    kx,ky = zeros(Lkx),zeros(Lky)
 
     for lat in latset
-        rr,CC = space_correlation_Cr_nonperiodic(lat,connected=connected)
+        (rx,ry,CC),(kx,ky,CCk) = space_correlation_Cr_Ck_nonperiodic(lat,connected=connected)
         Cr .+= CC
+        Ck .+= CCk
     end
     if !isnothing(Δ)
-        rr[1] .*= Δ[1]
-        rr[2] .*= Δ[2]
+        rx .*= Δ[1]
+        ry .*= Δ[2]
+        kx ./= Δ[1]
+        ky ./= Δ[2]
     end
-    return rr...,Cr/size(latset,1)
+    return (rx,ry,Cr./size(latset,1)),(kx,ky,Ck./size(latset,1))
 end
 
-function space_correlation_Cr_nonperiodic(lat::AbstractMatrix{T};
+function space_correlation_Cr_Ck_nonperiodic(lat::AbstractMatrix{T};
                                              connected=false) where T<:Number
     Lx = size(lat,1)
     Ly = size(lat,2)
@@ -133,11 +141,21 @@ function space_correlation_Cr_nonperiodic(lat::AbstractMatrix{T};
     else
         lat2[1:Lx,1:Ly] .= lat
     end
-    (rx,ry,Cr),_ = space_correlation_Cr_Ck(lat2)
+    (rx,ry,Cr),(kx,ky,Ck) = space_correlation_Cr_Ck(lat2)
     Cr = 4*Lx*Ly*Cr[1:Lx,1:Ly]
     for i=1:Lx Cr[i,:] ./= (Lx-i+1) end
     for j=1:Ly Cr[:,j] ./= (Ly-j+1) end
-    return (rx[1:Lx],ry[1:Ly]),Cr
+
+    # In Ck, half the frequencies must be discarded because the actual Δk is
+    # twice that computed for the dataset padded with zeros.  After that,
+    # we discard the negative frequencies, since Ck is even in k
+    Ck = 4*Ck[1:2:Lx+1,1:2:Ly+1]
+    kx = kx[1:2:Lx+1]
+    kx[end] *= -1
+    ky = ky[1:2:Ly+1]
+    ky[end] *= -1
+
+    return (rx[1:Lx],ry[1:Ly],Cr),(kx,ky,Ck)
 end
 
 ###############################################################################
