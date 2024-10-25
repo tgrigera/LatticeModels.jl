@@ -55,12 +55,12 @@ random_site(lat::Lat) where Lat <: SQLattice{T} where T = SQLattice_site(lat,ran
 random_site(rng,lat::Lat) where Lat <: SQLattice{T} where T = SQLattice_site(lat,rand(rng,1:size(lat,1)),rand(rng,1:size(lat,2)))
 
 function random_site!(site::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T
-    site.I=CartesianIndex(rand(1:size(site.nodes,1)),rand(1:size(site.nodes,1)))
+    site.I=CartesianIndex(rand(1:size(site.nodes,1)),rand(1:size(site.nodes,2)))
 end
 
 function random_site!(rng,site::SQLattice_site{Lat}) where Lat <: SQLattice{T} where T
 #    site.I=rand(rng,CartesianIndices(site.nodes))  # slower?
-    site.I=CartesianIndex(rand(rng,1:size(site.nodes,1)),rand(rng,1:size(site.nodes,1)))
+    site.I=CartesianIndex(rand(rng,1:size(site.nodes,1)),rand(rng,1:size(site.nodes,2)))
 end
 
 ###############################################################################

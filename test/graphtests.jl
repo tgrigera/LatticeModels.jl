@@ -16,7 +16,7 @@
 # check <https://www.gnu.org/licenses/>.
 
 function SQLattice_test()
-    @testset "Square lattice tests" begin
+    @testset "Square lattice" begin
         L=5
         M=7
         lat=SQLattice_open{Tuple{Int,Int}}(L,M)
@@ -67,7 +67,7 @@ function SQLattice_test()
 end
 
 function SQLattice_test_binning()
-    @testset "Testing binnings" begin
+    @testset "binnings" begin
         lat=SQLattice_open{Int}(30,33)
         bn=distance_binning(lat)
         IS=CartesianIndices(lat)
@@ -108,4 +108,68 @@ function SQLattice_test_binning()
         end
 
     end
+end
+
+
+
+function SCLattice_test()
+    @testset "Simple cubic lattice" begin
+        L=5
+        M=7
+        N=3
+        # lat=SQLattice_open{Tuple{Int,Int}}(L,M)
+        # for j=1:M,i=1:L
+        #     lat[i,j]=(i,j)
+        # end
+        # n=Ref(0)
+        # foreach_bond(lat) do i,j
+        #     n[]+=1
+        # end
+        # @test n[] == 2*L*M-L-M
+
+        # rs=random_site(lat)
+        # foreach_neighbour!(rs) do s
+        #     s[]=(0,0)
+        # end
+        # i,j=rs.I[1],rs.I[2]
+        # @test (i>=L || lat[i+1,j]==(0,0)) &&
+        #     (i<=1 || lat[i-1,j]==(0,0)) &&
+        #     (j>=M || lat[i,j+1]==(0,0)) &&
+        #     (j<=1 || lat[i,j-1]==(0,0))
+
+        lat=SCLattice_periodic{Tuple{Int,Int,Int}}(L,M,N)
+        for k=1:N, j=1:M, i=1:L
+            lat[i,j,k]=(i,j,k)
+        end
+        n=Ref(0)
+        foreach_bond(lat) do _,__
+            n[]+=1
+        end
+        @test n[] == 3*L*M*N
+
+        rs=random_site(lat)
+        foreach_neighbour!(rs) do s
+            s[]=(0,0,0)
+        end
+        res = Ref(true)
+        foreach_neighbour(rs) do s
+            res[] = res[] && s==(0,0,0)
+        end
+        @test res[]
+
+        i,j,k = rs.I[1],rs.I[2],rs.I[3]
+        @test (i>=L || lat[i+1,j,k]==(0,0,0)) &&
+              (i<L  || lat[1,j,k]==(0,0,0)) &&
+              (i<=1 || lat[i-1,j,k]==(0,0,0)) &&
+              (i>1  || lat[L,j,k]==(0,0,0)) &&
+              (j>=M || lat[i,j+1,k]==(0,0,0)) &&
+              (j<M  || lat[i,1,k]==(0,0,0)) &&
+              (j<=1 || lat[i,j-1,k]==(0,0,0)) &&
+              (j>1  || lat[i,M,k]==(0,0,0)) &&
+              (k>=N || lat[i,j,k+1]==(0,0,0)) &&
+              (k<N  || lat[i,j,1]==(0,0,0)) &&
+              (k<=1 || lat[i,j,k-1]==(0,0,0)) &&
+              (k>1  || lat[i,j,N]==(0,0,0))
+    end
+
 end

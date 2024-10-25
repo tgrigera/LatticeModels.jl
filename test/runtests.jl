@@ -21,7 +21,6 @@ using Test
 
 include("./graphtests.jl")
 
-@testset "LatticeModels.jl" begin
-    SQLattice_test()
-    SQLattice_test_binning()
-end
+SQLattice_test()
+SQLattice_test_binning()
+SCLattice_test()
