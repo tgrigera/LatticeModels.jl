@@ -25,4 +25,6 @@ include("./models/IsingModel.jl")
 
 include("./models/Sandpiles.jl")
 
+include("./models/Heisenberg.jl")
+
 end
