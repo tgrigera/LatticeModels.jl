@@ -4,6 +4,8 @@ using LinearAlgebra
 import Printf
 import Dates
 
+export QHeisenberg, run!
+
 """
     QHeisenberg
 
@@ -43,11 +45,13 @@ function QHeisenberg(graph_type,L...;q,N,seed=33,T=1.,h=0.,ordered=false)
     graph = graph_type{MVector{N,Float64}}(L...)
     hv = [0. for _=1:N]
     hv[1] = h
-    qH = QHeisenberg{q,N,graph_type,Random.Xoshiro}(hv,0.,0,0.,hv,0.,0.,graph,RNG)
+    # note typeof(graph) below: this is required so that a concrete, rather than an abstract,
+    # type, is passed as parameter to the QHeisenberg struct.
+    qH = QHeisenberg{q,N,typeof(graph),Random.Xoshiro}(hv,0.,0,0.,hv,0.,0.,graph,RNG)
     for i ∈ eachindex(qH.σ)
         qH.σ[i] = MVector{N,Float64}([0. for _=1:N])
     end
-   set_temperature!(qH,T)
+    set_temperature!(qH,T)
     if ordered
         map(x->x[1]=1.,qH.σ)
     else
@@ -66,12 +70,13 @@ end
 
 function set_energy_mag!(qH::QHeisenberg)
     qH.E = energy_h0(qH)
-    qH.M .= magnetization(qH)
+    qH.M .= 0.
+    for s ∈ qH.σ
+        qH.M .+= s
+    end
     qH.m = LinearAlgebra.norm(qH.M)/length(qH.σ)
     qH.E -= qH.h ⋅ qH.M
 end
-
-magnetization(qH::QHeisenberg) = sum(qH.σ)
 
 function energy_h0(qH::QHeisenberg{q}) where q
     E=Ref(0.)
@@ -166,26 +171,25 @@ end
 export Metropolis!
 
 function Metropolis_step!(qH::QHeisenberg{q}) where q
-    I = random_site(qH.σ)
-    ΔE = Ref{Float64}(0.)
-#    σn = copy(qH.σ[I])
-@info "here"
+   I = random_site(qH.σ)
+   ΔE = Ref{Float64}(0.)
+   σn = copy(qH.σ[I])
     for _ ∈ 1:length(qH.σ)
-#        random_site!(qH.RNG,I)
- #       σo = qH.σ[I]
+        random_site!(qH.RNG,I)
+        σo = qH.σ[I]
         ΔE[] = 0
-#        rand_sphere!(qH.RNG,σn)
-        # foreach_neighbour(I) do σ
-        #     ΔE[] += (1 - σn⋅σ)^q - (1 - σo⋅σ)^q - qH.h⋅(σn .- σo)
-  #      end
-        # ΔE[] *= 2^q
-        # if ΔE[]<=0. || rand(qH.RNG)<exp(-qH.β*ΔE[])
-        #     qH.M .+= σn .- σo
-        #     σo .= σn
-        #     qH.E += ΔE[]
-        # end
+        rand_sphere!(qH.RNG,σn)
+        foreach_neighbour(I) do σ
+            ΔE[] += (1 - σn⋅σ)^q - (1 - σo⋅σ)^q - qH.h⋅(σn .- σo)
+        end
+        ΔE[] *= 2^q
+        if ΔE[]<=0. || rand(qH.RNG)<exp(-qH.β*ΔE[])
+            qH.M .+= σn .- σo
+            σo .= σn
+            qH.E += ΔE[]
+        end
     end
-#    qH.steps += 1
+    qH.steps += 1
 end
 
 """
