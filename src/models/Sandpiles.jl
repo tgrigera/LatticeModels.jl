@@ -24,7 +24,7 @@ abstract type Boundary_conditions end
 struct Open_boundaries <: Boundary_conditions end
 struct Semiopen_boundaries <: Boundary_conditions end
 
-export BTW_sandpile, run!
+export BTW_sandpile
 
 mutable struct BTW_sandpile{RNG_T<:AbstractRNG, BC_T<:Boundary_conditions}
     L::Int

@@ -1,10 +1,10 @@
 using Random
 using StaticArrays
 using LinearAlgebra
+using JLD2
 import Printf
-import Dates
 
-export QHeisenberg, run!
+export QHeisenberg, Metropolis_step!, update_observables!
 
 """
     QHeisenberg
@@ -168,8 +168,6 @@ end
 #
 # Single spin-flip Metropolis
 
-export Metropolis!
-
 function Metropolis_step!(qH::QHeisenberg{q}) where q
    I = random_site(qH.σ)
    ΔE = Ref{Float64}(0.)
@@ -192,33 +190,6 @@ function Metropolis_step!(qH::QHeisenberg{q}) where q
     qH.steps += 1
 end
 
-"""
-    run!(qH::QHeisenberg; steps::Integer = 1,log_interval::Integer=0,
-         obs_interval::Integer = 0,observer=nothing)
-
-"""
-function run!(qH::QHeisenberg; steps::Integer = 1,log_interval::Integer=0,
-    obs_interval::Integer = 0,observer=nothing)
-    @assert steps ≥ 0
-    @assert log_interval ≥ 0
-    @assert obs_interval ≥ 0
-
-    ostart = qH.steps == 0 ? 0 : qH.steps+1
-    if obs_interval>0 && ostart==qH.steps observe(qH,observer) end
-    if log_interval>0 log_start(qH) end
-    for _ in 1:steps
-        Metropolis_step!(qH)
-        obs_now = obs_interval>0 && qH.steps % obs_interval == 0
-        log_now = log_interval>0 && qH.steps % log_interval == 0
-        if obs_now || log_now update_observables!(qH) end
-        if obs_now observe(qH,observer) end
-        if log_now log(qH) end
-    end
-    update_observables!(qH)
-    if log_interval>0 log_stop(qH) end
-    return nothing
-end
-
 ###############################################################################
 ##
 ## Log
@@ -226,7 +197,6 @@ end
 function log_start(qH::QHeisenberg{q,N}) where q where N
     Ns = length(qH.σ)
     @info "Running $(q)-Heisenberg model with $N-dimensional spins\n"
-    @info "Run start $(Dates.format(Dates.now(),"YYYY-u-dd HH:MM:SS"))\n"
     @info  "    Step          E/N      |m|\n";
     @info Printf.@sprintf(" Initial   %10.3e %10.3e\n",
 	qH.E/Ns,qH.m)
@@ -236,10 +206,6 @@ function log(qH::QHeisenberg)
     Ns = length(qH.σ)
     @info Printf.@sprintf("%8ld   %10.3e %10.3e\n",
 	qH.steps,qH.E/Ns,qH.m)
-end
-
-function log_stop(::QHeisenberg)
-    @info "Run stop $(Dates.format(Dates.now(),"YYYY-u-dd HH:MM:SS"))"
 end
 
 ###############################################################################
@@ -254,21 +220,119 @@ end
 ##
 ## Observers
 
-abstract type Observer{M} end
+struct StandardObserver{ModelT,IOT<:IO}# <: Observer{ModelT}
+    filename::String
+    io::IOT
+    model::ModelT
 
-struct MemoryObserver{M,N} <: Observer{QHeisenberg} where N
-    M::Vector{MVector{N,Float64}}        # Magnetisation
-    m::Vector{Float64}                   # Scalar magnetisaiton per spin
-    E::Vector{Float64}                   # Energy
-    t::Vector{Int}
+    function StandardObserver(model,fname=nothing)
+        if isnothing(fname) return new{typeof(model),typeof(stdout)}("",stdout,model) end
+        return new{typeof(model),IOStream}(fname,open(fname,"w"),model)
+    end
 end
 
-MemoryObserver(::QHeisenberg{q,N}) where q where N =
-    MemoryObserver{QHeisenberg,N}(MVector{N,Float64}[], Float64[], Float64[], Int[])
+function observation_start(o::StandardObserver{QHeisenberg{q,N,graph,RNG},IOT}) where {q,N,graph,RNG,IOT}
+    Printf.@printf(o.io,"#   Step    Energy    Magnetization Magnetization (vector)\n")
+end
 
-function observe(qH::QHeisenberg,o::MemoryObserver{QHeisenberg})
-    push!(o.t,qH.steps)
-    push!(o.E,qH.E)
-    push!(o.M,qH.M)
-    push!(o.m,qH.m)
+function observe(o::StandardObserver{QHeisenberg{q,N,graph,RNG},IOT}) where {q,N,graph,RNG,IOT}
+    qH = o.model
+    Ns = length(qH.σ)
+    if N==2
+        Printf.@printf(o.io,"%8ld   %10.3e %13.3e %10.3e %10.3e\n",
+	    qH.steps,qH.E/Ns,qH.m,qH.M[1]/Ns,qH.M[2]/Ns)
+    elseif N==3
+        Printf.@printf(o.io,"%8ld   %10.3e %13.3e %10.3e %10.3e %10.3e\n",
+	    qH.steps,qH.E/Ns,qH.m,qH.M[1]/Ns,qH.M[2]/Ns,qH.M[3]/Ns)
+    else
+        @error "N=$N not supported"
+    end
+end
+
+function observation_stop(o::StandardObserver)
+    if o.io!=stdout close(o.io) end
+end
+
+# struct MemoryObserver{N} <: Observer where N
+#     M::Vector{MVector{N,Float64}}        # Magnetisation
+#     m::Vector{Float64}                   # Scalar magnetisaiton per spin
+#     E::Vector{Float64}                   # Energy
+#     t::Vector{Int}
+# end
+
+# MemoryObserver(::QHeisenberg{q,N}) where q where N =
+#     MemoryObserver{N}(MVector{N,Float64}[], Float64[], Float64[], Int[])
+
+# function observe(qH::QHeisenberg,o::MemoryObserver)
+#     push!(o.t,qH.steps)
+#     push!(o.E,qH.E)
+#     push!(o.M,qH.M)
+#     push!(o.m,qH.m)
+# end
+
+mutable struct TrajectoryObserver{ModelT<:QHeisenberg,JIOT}
+    qH          ::ModelT
+    N            ::Int64
+    fname        ::String
+    jio          ::JIOT
+    obs_interval ::Int64
+    ssteps       ::Vector{Int}
+
+    function TrajectoryObserver(model::QHeisenberg{q,N},fname,obs_interval) where {q,N}
+        jio = jldopen(fname,"w")
+        return new{typeof(model),typeof(jio)}(model,N,fname,jio,obs_interval,[])
+    end
+end
+
+function observation_start(o::TrajectoryObserver)
+    o.jio["N"] = o.N
+    return nothing
+end
+
+function observe(o::TrajectoryObserver)
+    push!(o.ssteps,o.qH.steps)
+    o.jio["s$(o.qH.steps)/σ"] = o.qH.σ
+    return nothing
+end
+
+function observation_stop(o::TrajectoryObserver)
+    o.jio["ssteps"] = o.ssteps
+    close(o.jio)
+end
+
+###############################################################################
+##
+## saving configuration and state
+
+"""
+    save_configuration(qH::QHeisenberg,filename)
+
+Save lattice (spins) in binary format
+"""
+function save_configuration(qH::QHeisenberg{Q,N},filename) where {Q,N}
+    jldsave(filename;qH.σ,N)
+end
+
+function load_configuration!(qH::QHeisenberg{Q,N},filename) where {Q,N}
+    dic = load(filename)
+    @assert dic["N"] == N
+    qH.σ = dic["σ"]
+    set_energy_mag!(qH)
+end
+
+function save_state(qH::QHeisenberg{Q,N},filename) where {Q,N}
+     jldsave(filename; Q = Q, N = N, h = qH.h[1], T  = qH.T, steps = qH.steps,
+         σ = qH.σ, RNG = qH.RNG, graph_type = Base.typename(typeof(qH.σ)).wrapper)
+end
+
+function load_state(::QHeisenberg,filename)
+    dic = load(filename)
+    L = [3 for _=1:dic["N"]]
+    qH = QHeisenberg(dic["graph_type"],L...;q=dic["Q"],N=dic["N"],T=dic["T"],
+         h=dic["h"], ordered=true)
+    qH.steps = dic["steps"]
+    qH.RNG = dic["RNG"]
+    qH.σ = dic["σ"]
+    set_energy_mag!(qH)
+    return qH
 end
