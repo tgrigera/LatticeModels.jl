@@ -39,6 +39,16 @@ function space_correlation_Cr_Ck_iso(lat::Matrix{T}) where T<:Number
     
 end
 
+function space_correlation_Cr_Ck_iso(lat::AbstractArray{T,3}) where T
+
+    (rx, ry, rz, Cr) , (kx, ky, kz, Ck) = space_correlation_Cr_Ck(lat)
+    r,Cr = to_iso_3d(rx,ry,rz,Cr)
+    k,Ck = to_iso_3d(kx,ky,kz,Ck)
+
+    return r,Cr,k,Ck
+    
+end
+
 function space_correlation_Cr_Ck(latset::AbstractVector)
 
     CC = space_correlation_Cr_Ck(latset[1],dry_run=true)
@@ -64,12 +74,21 @@ function space_correlation_Cr_Ck(lat::AbstractMatrix{T};dry_run=false) where T<:
     return (rx, ry, Crxy) , (kx, ky, Ck)
 end
 
+function space_correlation_Cr_Ck(lat::AbstractArray{T,3},dry_run=false) where T<:Number
+    kx,ky,kz,Ck = space_correlation_Ck_fft(lat,dry_run)
+    Crxy = dry_run ? zeros(Float64,size(lat)) : real.(ifft(Ck))
+    rx = size(lat,1) * fftfreq(size(lat,1))
+    ry = size(lat,2) * fftfreq(size(lat,2))
+    rz = size(lat,3) * fftfreq(size(lat,3))
+    return (rx, ry, rz, Crxy) , (kx, ky, kz, Ck)
+end
+
 function to_iso_2d(rx,ry,C)
     rmax = max(maximum(rx),maximum(ry))
     Δ = min(rx[2],ry[2])
-    Np = BioStatPhys.BinnedVector{Int}(Δ=Δ, min=Δ,max=rmax,round_max=RoundUp,
+    Np = BioStatPhys.BinnedVector{Int}(Δ=Δ, min=Δ/2,max=rmax,round_max=RoundUp,
                                        init=zeros)
-    Ciso = BioStatPhys.BinnedVector{Float64}(Δ=Δ, min=Δ,max=rmax,round_max=RoundUp,
+    Ciso = BioStatPhys.BinnedVector{Float64}(Δ=Δ, min=Δ/2,max=rmax,round_max=RoundUp,
                                               init=zeros)
 
     for (ik,kx) ∈ enumerate(rx), (jk,ky) ∈ enumerate(ry)
@@ -85,6 +104,26 @@ function to_iso_2d(rx,ry,C)
     return vcat(0,collect(range(Ciso))),vcat(C0,Ciso./Np)
 end
 
+function to_iso_3d(rx,ry,rz,C)
+    rmax = max(maximum(rx),maximum(ry),maximum(rz))
+    Δ = min(rx[2],ry[2],rz[2])
+    Np = BioStatPhys.BinnedVector{Int}(Δ=Δ,min=Δ/2,max=rmax,round_max=RoundUp,
+                                       init=zeros)
+    Ciso = BioStatPhys.BinnedVector{Float64}(Δ=Δ,min=Δ/2,max=rmax,round_max=RoundUp,
+        init=zeros)
+
+    for I ∈ CartesianIndices(C)
+        k = sqrt(rx[I[1]]^2 + ry[I[2]]^2 + rz[I[3]]^2)
+        Np[k] +=1
+        Ciso[k] += C[I]
+    end
+    C0 = C[1,1]
+    Ciso[0] -= C0
+    Np[0] -= 1
+                                              
+    return vcat(0,collect(range(Ciso))), vcat(C0,Ciso./Np)
+end
+
 function space_correlation_Ck_fft(lat::AbstractMatrix{T},dry_run=false) where T<:Number
     Lx = size(lat,1)
     Ly = size(lat,2)
@@ -95,6 +134,20 @@ function space_correlation_Ck_fft(lat::AbstractMatrix{T},dry_run=false) where T<
 
     Ck = abs2.(fft(lat)) ./ N
     return kxr,kyr,Ck
+end
+
+function space_correlation_Ck_fft(lat::AbstractArray{T,3},dry_run=false) where T<:Number
+    Lx = size(lat,1)
+    Ly = size(lat,2)
+    Lz = size(lat,3)
+    N = Lx*Ly*Lz
+    kxr = 2π * fftfreq(Lx)
+    kyr = 2π * fftfreq(Ly)
+    kzr = 2π * fftfreq(Lz)
+    if dry_run return kxr,kyr,kzr,zeros(Float64,size(lat)) end
+
+    Ck = abs2.(fft(lat)) ./ N
+    return kxr,kyr,kzr,Ck
 end
 
 ###############################################################################

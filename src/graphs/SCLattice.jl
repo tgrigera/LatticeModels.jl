@@ -25,11 +25,11 @@ Base.size(lat::SCLattice{T}) where T = size(lat.nodes)
 
 Base.getindex(lat::SCLattice{T},i::Int) where T = getindex(lat.nodes,i)
 
-Base.getindex(lat::SCLattice{T},I::CartesianIndex{2}) where T = getindex(lat.nodes,I)
+Base.getindex(lat::SCLattice{T},I::CartesianIndex{3}) where T = getindex(lat.nodes,I)
 
 Base.setindex!(lat::SCLattice{T},v,i::Int) where T = setindex!(lat.nodes,v,i)
 
-Base.setindex!(lat::SCLattice{T},v,I::CartesianIndex{2}) where T = setindex!(lat.nodes,v,I)
+Base.setindex!(lat::SCLattice{T},v,I::CartesianIndex{3}) where T = setindex!(lat.nodes,v,I)
 
 Base.IndexStyle(::Type{<:SCLattice}) = IndexLinear()
 
