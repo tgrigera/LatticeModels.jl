@@ -224,13 +224,15 @@ end
 export Wolff!
 
 """
-    Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,conf_save_interval::Int=0)
+    Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,
+           conf_save_interval::Int=0,conf_save_function=nothing)
 
 Do `steps` Monte Carlo steps for the Ising model `IS` using the Wolff
-cluster algorithm.  `conf_save_interval` is not implemented.  If
-`save_interval>0` return a tuple (E, M) with energy and magnetization
-per spin, saved every `save_interval` steps.
+cluster algorithm.  If `save_interval>0` return a tuple (E, M) with
+energy and magnetization per spin, saved every `save_interval` steps.
 
+If `conf_save_inverval>0`, call `conf_save_function` every `conf_save_inverval`
+steps, passing the configuration as argument.
 """
 function Wolff!(IS::Ising;steps::Int = 1,save_interval::Int=0,
                conf_save_interval::Int=0,conf_save_function=nothing)

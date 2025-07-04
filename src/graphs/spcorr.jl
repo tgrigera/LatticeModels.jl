@@ -19,9 +19,9 @@
 using AbstractFFTs
 import Statistics
 
-function space_correlation_Cr_Ck_iso(latset::AbstractVector)
+function space_correlation_Cr_Ck_iso(latset::AbstractVector;connected=false)
 
-    (rx, ry, Crxy), (kx, ky, Ck) = space_correlation_Cr_Ck(latset)
+    (rx, ry, Crxy), (kx, ky, Ck) = space_correlation_Cr_Ck(latset,connected=connected)
     r,Cr = to_iso_2d(rx,ry,Crxy)
     k,Ck = to_iso_2d(kx,ky,Ck)
 
@@ -29,9 +29,9 @@ function space_correlation_Cr_Ck_iso(latset::AbstractVector)
     
 end
 
-function space_correlation_Cr_Ck_iso(lat::Matrix{T}) where T<:Number
+function space_correlation_Cr_Ck_iso(lat::Matrix{T};connected=false) where T<:Number
 
-    (rx, ry, Crxy) , (kx, ky, Ck) = space_correlation_Cr_Ck(lat)
+    (rx, ry, Crxy) , (kx, ky, Ck) = space_correlation_Cr_Ck(lat,connected=connected)
     r,Cr = to_iso_2d(rx,ry,Crxy)
     k,Ck = to_iso_2d(kx,ky,Ck)
 
@@ -49,7 +49,7 @@ function space_correlation_Cr_Ck_iso(lat::AbstractArray{T,3}) where T
     
 end
 
-function space_correlation_Cr_Ck(latset::AbstractVector)
+function space_correlation_Cr_Ck(latset::AbstractVector;connected=false)
 
     CC = space_correlation_Cr_Ck(latset[1],dry_run=true)
     Cr = last(first(CC))
@@ -58,7 +58,7 @@ function space_correlation_Cr_Ck(latset::AbstractVector)
     rk = CC[2][1:length(CC[1])-1]
 
     for lat in latset
-        CC1 = space_correlation_Cr_Ck(lat)
+        CC1 = space_correlation_Cr_Ck(lat,connected=connected)
         Cr .+= last(first(CC1))
         Ck .+= last(last(CC1))
     end
@@ -66,8 +66,15 @@ function space_correlation_Cr_Ck(latset::AbstractVector)
 
 end
 
-function space_correlation_Cr_Ck(lat::AbstractMatrix{T};dry_run=false) where T<:Number
-    kx,ky,Ck = space_correlation_Ck_fft(lat,dry_run)
+function space_correlation_Cr_Ck(lat::AbstractMatrix{T};dry_run=false,connected=false) where T<:Number
+    if connected
+        lat2 = zeros(Float64,size(lat)...)
+        mean = Statistics.mean(lat)
+        lat2 .= lat .- mean
+    else
+        lat2 = lat
+    end
+    kx,ky,Ck = space_correlation_Ck_fft(lat2,dry_run)
     Crxy = dry_run ? zeros(Float64,size(lat)) : real.(ifft(Ck))
     rx = size(lat,1) * fftfreq(size(lat,1))
     ry = size(lat,2) * fftfreq(size(lat,2))
@@ -144,7 +151,7 @@ function space_correlation_Ck_fft(lat::AbstractArray{T,3},dry_run=false) where T
     kxr = 2π * fftfreq(Lx)
     kyr = 2π * fftfreq(Ly)
     kzr = 2π * fftfreq(Lz)
-    if dry_run return kxr,kyr,kzr,zeros(Float64,size(lat)) end
+
 
     Ck = abs2.(fft(lat)) ./ N
     return kxr,kyr,kzr,Ck
